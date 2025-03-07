@@ -10,8 +10,10 @@ use std::thread;
 use std::time::Duration;
 use swayipc::{Connection, EventType, Node};
 
+use crate::config::{DockConfig, EdgeConfig};
+
 // Create a dock attached to the given application
-pub fn create_dock(app: &Application) {
+pub fn create_dock(app: &Application, config: &DockConfig) {
     // Store window info in thread-safe container
     let windows = Arc::new(Mutex::new(Vec::new()));
     let windows_clone = Arc::clone(&windows);
@@ -36,20 +38,43 @@ pub fn create_dock(app: &Application) {
         }
     });
 
+    // Determine orientation based on edge
+    let orientation = match config.edge {
+        EdgeConfig::Left | EdgeConfig::Right => Orientation::Vertical,
+        EdgeConfig::Top | EdgeConfig::Bottom => Orientation::Horizontal,
+    };
+
+    // Determine dimensions based on orientation
+    let (width, height) = match orientation {
+        Orientation::Horizontal => (800, 60),
+        Orientation::Vertical => (60, 800),
+        _ => (800, 60),
+    };
+
     // Create main dock window
     let dock_window = ApplicationWindow::builder()
         .application(app)
         .title("Sway Dock")
-        .default_width(800)
-        .default_height(60)
+        .default_width(width)
+        .default_height(height)
         .build();
 
     // Set up layer shell
     dock_window.init_layer_shell();
     dock_window.set_layer(Layer::Top);
-    dock_window.set_anchor(Edge::Bottom, true);
-    dock_window.set_anchor(Edge::Left, true);
-    dock_window.set_anchor(Edge::Right, true);
+    dock_window.set_anchor(config.edge.to_edge(), true);
+
+    // Set anchors for top/bottom edges
+    match config.edge {
+        EdgeConfig::Top | EdgeConfig::Bottom => {
+            dock_window.set_anchor(Edge::Left, true);
+            dock_window.set_anchor(Edge::Right, true);
+        }
+        EdgeConfig::Left | EdgeConfig::Right => {
+            dock_window.set_anchor(Edge::Top, true);
+            dock_window.set_anchor(Edge::Bottom, true);
+        }
+    }
 
     // Make window transparent
     dock_window.set_app_paintable(true);
@@ -59,16 +84,16 @@ pub fn create_dock(app: &Application) {
         false.into()
     });
 
-    // Create dock container
-    let dock_box = GtkBox::new(Orientation::Horizontal, 5);
+    // Create dock container with configured orientation
+    let dock_box = GtkBox::new(orientation, 5);
     dock_box.set_halign(gtk::Align::Center);
     dock_box.set_margin(5);
 
-    // Create detection area (small strip at bottom)
+    // Create detection area (small strip at the configured edge)
     let detection_window = ApplicationWindow::builder()
         .application(app)
         .title("Dock Detector")
-        .default_width(800)
+        .default_width(width)
         .default_height(1)
         .height_request(1)
         .build();
@@ -76,9 +101,18 @@ pub fn create_dock(app: &Application) {
     // Set up layer shell for detection window
     detection_window.init_layer_shell();
     detection_window.set_layer(Layer::Overlay);
-    detection_window.set_anchor(Edge::Bottom, true);
-    detection_window.set_anchor(Edge::Left, true);
-    detection_window.set_anchor(Edge::Right, true);
+    detection_window.set_anchor(config.edge.to_edge(), true);
+
+    match config.edge {
+        EdgeConfig::Top | EdgeConfig::Bottom => {
+            detection_window.set_anchor(Edge::Left, true);
+            detection_window.set_anchor(Edge::Right, true);
+        }
+        EdgeConfig::Left | EdgeConfig::Right => {
+            detection_window.set_anchor(Edge::Top, true);
+            detection_window.set_anchor(Edge::Bottom, true);
+        }
+    }
 
     // Hide dock initially
     dock_window.hide();
@@ -91,8 +125,10 @@ pub fn create_dock(app: &Application) {
         false.into()
     });
 
+    // Use configured hide_timeout
+    let hide_delay = config.hide_timeout;
+
     // Hide dock when mouse completely leaves it (not when it moves between children)
-    let hide_delay = 300; // ms
     dock_window.connect_leave_notify_event(move |window, event| {
         // Get the crossing detail - this tells us where the pointer went
         let detail = event.detail();
@@ -120,9 +156,10 @@ pub fn create_dock(app: &Application) {
     // Update dock contents periodically
     let windows_ref = Arc::clone(&windows);
     let dock_box_ref = dock_box.clone();
+    let orientation = orientation.clone();
     glib::timeout_add_local(Duration::from_millis(1000), move || {
-        update_dock_ui(&dock_box_ref, &windows_ref);
-        false.into()
+        update_dock_ui(&dock_box_ref, &windows_ref, orientation);
+        true.into()
     });
 
     // Apply CSS styling
@@ -200,7 +237,11 @@ fn extract_windows(node: &Node, windows: &mut Vec<WindowInfo>) {
 }
 
 // Update the dock UI with current windows
-fn update_dock_ui(dock_box: &GtkBox, windows: &Arc<Mutex<Vec<WindowInfo>>>) {
+fn update_dock_ui(
+    dock_box: &GtkBox,
+    windows: &Arc<Mutex<Vec<WindowInfo>>>,
+    orientation: Orientation,
+) {
     // Clear existing children
     for child in dock_box.children() {
         dock_box.remove(&child);
@@ -220,20 +261,24 @@ fn update_dock_ui(dock_box: &GtkBox, windows: &Arc<Mutex<Vec<WindowInfo>>>) {
 
         // Create button for each window
         let button = Button::new();
-        let vbox = GtkBox::new(Orientation::Vertical, 2);
+        let container_box = match orientation {
+            Orientation::Horizontal => GtkBox::new(Orientation::Vertical, 2),
+            Orientation::Vertical => GtkBox::new(Orientation::Horizontal, 2),
+            _ => GtkBox::new(Orientation::Horizontal, 2),
+        };
 
         // Add icon
         let icon_name = get_icon_for_app(&window.app_id);
         let icon = Image::from_icon_name(Some(&icon_name), gtk::IconSize::Dnd);
-        vbox.pack_start(&icon, true, true, 0);
+        container_box.pack_start(&icon, true, true, 0);
 
-        // Add label
+        // Add label with orientation-aware positioning
         let label = Label::new(Some(&window.title));
         label.set_max_width_chars(10);
         label.set_ellipsize(pango::EllipsizeMode::End);
-        vbox.pack_start(&label, false, false, 0);
+        container_box.pack_start(&label, false, false, 0);
 
-        button.add(&vbox);
+        button.add(&container_box);
 
         // Connect click to focus window
         let window_id = window.id;

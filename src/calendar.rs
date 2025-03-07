@@ -4,24 +4,26 @@ use gtk::{Application, ApplicationWindow, Button, Calendar, Orientation};
 use gtk_layer_shell::{Edge, Layer, LayerShell};
 use log::info;
 
-pub fn create_calendar(app: &Application) {
+use crate::config::CalendarConfig;
+
+pub fn create_calendar(app: &Application, config: &CalendarConfig) {
     info!("Creating calendar widget");
 
     // Create window
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Sway Calendar")
-        .default_width(300)
-        .default_height(250)
+        .default_width(config.size.width)
+        .default_height(config.size.height)
         .build();
 
     // Layer shell setup
     window.init_layer_shell();
     window.set_layer(Layer::Background);
     window.auto_exclusive_zone_enable();
-    window.set_size_request(300, 250);
-    window.set_layer_shell_margin(Edge::Top, 25);
-    window.set_layer_shell_margin(Edge::Left, 25);
+    window.set_size_request(config.size.width, config.size.height);
+    window.set_layer_shell_margin(Edge::Top, config.position.y);
+    window.set_layer_shell_margin(Edge::Left, config.position.x);
 
     // Set app paintable for transparent background
     window.set_app_paintable(true);
@@ -51,7 +53,6 @@ pub fn create_calendar(app: &Application) {
 
     // Set calendar to start week on Monday (1 = Monday, 0 = Sunday)
     calendar.set_property("show-details", &false);
-    // calendar.set_property("start-week-day", &1i32);
 
     // Set current date
     calendar.select_month(month as u32, year as u32);

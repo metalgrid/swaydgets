@@ -12,3 +12,6 @@ gtk-layer-shell = "0.8.2"
 log = "0.4.26"
 pango = "0.20.9"
 swayipc = "3.0.3"
+dirs = "5.0"                                           # For XDG directories
+toml = "0.8.8"                                         # For TOML parsing
+serde = { version = "1.0.197", features = ["derive"] } # For serialization

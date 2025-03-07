@@ -1,0 +1,14 @@
+[package]
+name = "swi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.40"
+env_logger = "0.11.6"
+glib = "0.20.9"
+gtk = "0.18.2"
+gtk-layer-shell = "0.8.2"
+log = "0.4.26"
+pango = "0.20.9"
+swayipc = "3.0.3"

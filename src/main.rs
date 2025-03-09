@@ -32,7 +32,8 @@ fn main() {
         }
 
         // Load Lua scripts for custom widgets
-        if let Err(e) = script::load_scripts(app) {
+        let mut script_manager = script::ScriptManager::new(&app);
+        if let Err(e) = script_manager.load_scripts() {
             error!("Failed to load scripts: {}", e);
         }
     });

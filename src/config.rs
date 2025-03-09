@@ -1,9 +1,9 @@
+use gtk_layer_shell::Edge;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use gtk_layer_shell::Edge;
+use std::path::PathBuf;
 
 // Main configuration structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,7 +103,7 @@ pub struct Size {
 // Loads the configuration file or creates a default one if it doesn't exist
 pub fn load_config() -> Config {
     let config_path = get_config_path();
-    
+
     // Ensure config directory exists
     if let Some(config_dir) = config_path.parent() {
         if !config_dir.exists() {
@@ -113,7 +113,7 @@ pub fn load_config() -> Config {
             }
         }
     }
-    
+
     // Try to load the config file
     if config_path.exists() {
         match File::open(&config_path) {
@@ -136,7 +136,7 @@ pub fn load_config() -> Config {
             }
         }
     }
-    
+
     // If we get here, either the file doesn't exist or there was an error
     // Create a default config and save it
     let default_config = Config::default();
@@ -147,7 +147,7 @@ pub fn load_config() -> Config {
 // Saves the configuration to the config file
 pub fn save_config(config: &Config) -> bool {
     let config_path = get_config_path();
-    
+
     // Create config directory if needed
     if let Some(config_dir) = config_path.parent() {
         if !config_dir.exists() {
@@ -157,27 +157,25 @@ pub fn save_config(config: &Config) -> bool {
             }
         }
     }
-    
+
     // Serialize the config and write it to the file
     match toml::to_string_pretty(config) {
-        Ok(config_str) => {
-            match File::create(&config_path) {
-                Ok(mut file) => {
-                    if file.write_all(config_str.as_bytes()).is_ok() {
-                        info!("Configuration saved to {}", config_path.display());
-                        return true;
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to create config file: {}", e);
+        Ok(config_str) => match File::create(&config_path) {
+            Ok(mut file) => {
+                if file.write_all(config_str.as_bytes()).is_ok() {
+                    info!("Configuration saved to {}", config_path.display());
+                    return true;
                 }
             }
-        }
+            Err(e) => {
+                error!("Failed to create config file: {}", e);
+            }
+        },
         Err(e) => {
             error!("Failed to serialize config: {}", e);
         }
     }
-    
+
     false
 }
 
@@ -189,8 +187,8 @@ fn get_config_path() -> PathBuf {
         error!("Failed to determine config directory, using current directory");
         PathBuf::from(".")
     };
-    
-    path.push("swi");
+
+    path.push("swaydgets");
     path.push("config.toml");
     path
 }

@@ -1,18 +1,19 @@
 use gtk::Application;
 use gtk::prelude::*;
-use log::info;
+use log::{error, info};
 
 mod calendar;
 mod config;
 mod dock;
+mod script;
 
 fn main() {
     env_logger::init();
-    
+
     // Load configuration
     let config = config::load_config();
     info!("Configuration loaded: {:?}", config);
-    
+
     let app = Application::builder()
         .application_id("com.example.sway_widgets")
         .build();
@@ -28,6 +29,12 @@ fn main() {
         // Create the dock if enabled
         if config.dock.enabled {
             dock::create_dock(app, &config.dock);
+        }
+
+        // Load Lua scripts for custom widgets
+        let mut script_manager = script::ScriptManager::new(&app);
+        if let Err(e) = script_manager.load_scripts() {
+            error!("Failed to load scripts: {}", e);
         }
     });
 
